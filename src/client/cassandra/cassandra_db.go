@@ -23,6 +23,6 @@ func init() {
 	defer session.Close()
 }
 
-func GetSession() (*gocql.Session, error) {
-	return session, nil
+func GetSession() *gocql.Session {
+	return session
 }
