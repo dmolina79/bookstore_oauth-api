@@ -7,7 +7,9 @@ import (
 )
 
 const (
-	defaultExpirationTime = 24
+	defaultExpirationTime      = 24
+	grantTypePassword          = "password"
+	grantTypeClientCredentials = "client_credentials"
 )
 
 type AccessToken struct {
@@ -17,9 +19,29 @@ type AccessToken struct {
 	Expires     int64  `json:"expires"`
 }
 
-func GetNewAccessToken() AccessToken {
+type AccessTokenRequest struct {
+	GrantType string `json:"grant_type"`
+	Scope     string `json:"scope"`
+	// used for password grant type
+	Username string `json:"username"`
+	Password string `json:"password"`
+	// used for client_credentials grant type
+	ClientId     string `json:"client_id"`
+	ClientSecret string `json:"client_secret"`
+}
+
+func (ar *AccessTokenRequest) Validate() *errors.RestErr {
+	if ar.GrantType != grantTypePassword || ar.GrantType != grantTypeClientCredentials {
+		return errors.NewBadRequest("invalid grant type")
+	}
+	// TODO: validate parameters for each grant type
+	return nil
+}
+
+// TODO: generate code for JWT
+func GetNewAccessToken(userId string) AccessToken {
 	return AccessToken{
-		AccessToken: "",
+		AccessToken: userId,
 		UserId:      0,
 		ClientId:    0,
 		Expires:     time.Now().UTC().Add(defaultExpirationTime * time.Hour).Unix(),

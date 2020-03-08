@@ -1,6 +1,7 @@
 package access_token
 
 import (
+	"github.com/dmolina79/bookstore_oauth-api/src/repository/rest"
 	"github.com/dmolina79/bookstore_oauth-api/src/utils/errors"
 	"strings"
 )
@@ -13,17 +14,19 @@ type Repository interface {
 
 type Service interface {
 	GetById(string) (*AccessToken, *errors.RestErr)
-	Create(AccessToken) *errors.RestErr
+	Create(AccessTokenRequest) (*AccessToken, *errors.RestErr)
 	UpdateExpirationTime(AccessToken) *errors.RestErr
 }
 
 type service struct {
-	repository Repository
+	dbRepo       Repository
+	restUserRepo rest.UsersRepository
 }
 
-func NewService(repo Repository) Service {
+func NewService(repo Repository, userRepo rest.UsersRepository) Service {
 	return &service{
-		repository: repo,
+		dbRepo:       repo,
+		restUserRepo: userRepo,
 	}
 }
 
@@ -32,7 +35,7 @@ func (s *service) GetById(accessTokenId string) (*AccessToken, *errors.RestErr) 
 	if len(accessTokenId) == 0 {
 		return nil, errors.NewBadRequest("invalid access token id")
 	}
-	accessToken, err := s.repository.GetById(accessTokenId)
+	accessToken, err := s.dbRepo.GetById(accessTokenId)
 	if err != nil {
 		return nil, err
 	}
@@ -40,12 +43,23 @@ func (s *service) GetById(accessTokenId string) (*AccessToken, *errors.RestErr) 
 	return accessToken, nil
 }
 
-func (s *service) Create(at AccessToken) *errors.RestErr {
-	if err := at.Validate(); err != nil {
-		return err
+func (s *service) Create(req AccessTokenRequest) (*AccessToken, *errors.RestErr) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+	user, err := s.restUserRepo.LoginUser(req.Username, req.Password)
+	if err != nil {
+		return nil, err
 	}
 
-	return s.repository.Create(at)
+	// generate new access token
+	at := GetNewAccessToken(string(user.Id))
+	// save access token to DB cassandra
+
+	if err := s.dbRepo.Create(at); err != nil {
+		return nil, err
+	}
+	return &at, nil
 }
 
 func (s *service) UpdateExpirationTime(at AccessToken) *errors.RestErr {
@@ -53,5 +67,5 @@ func (s *service) UpdateExpirationTime(at AccessToken) *errors.RestErr {
 		return err
 	}
 
-	return s.repository.UpdateExpirationTime(at)
+	return s.dbRepo.UpdateExpirationTime(at)
 }
